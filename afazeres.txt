@@ -1,0 +1,14 @@
+- Ganhar :D
+
+01. Seguir linhas suaves com perfeição
+02. Seguir linhas com curva de 90graus
+03. Ultrapassar obstaculos
+04. Seguir linhas com cruzamentos com uma fita verde indicando o lado da curva
+05. Seguir linhas com cruzamentos de fita preta
+06. Seguir linhas com gap
+07. Identificar a chegada na pista de resgate
+08. Localizar vitimas
+09. Pegar vitimas
+10. Localizar plataforma de resgate
+11. Resgatar vitimas com sucesso
+---------------------------------------------------------------------------------------
