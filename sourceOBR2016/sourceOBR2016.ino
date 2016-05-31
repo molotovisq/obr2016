@@ -32,8 +32,7 @@ const int initSpeedLeft = 100;
 const int initSpeedRight = 100;
 
 void setup() {
-
-
+  Serial.begin(9600);
 }
 
 void loop() {
@@ -41,6 +40,8 @@ void loop() {
   globalError = readLine(sensorValue, quantityOfSensors);
   pd = calculatePD(globalError, lastGlobalError);
   getSpeeds();
+  invertSpeed();
+  printData();
 
 }
 
@@ -83,19 +84,44 @@ float calculatePD(int error, int lastError) {
   lastError = error;
   updateLastError(lastError);
 
-  return (P * kP) + (D * kD); 
+  return (P * kP) + (D * kD);
 }
 
 //Atualiza as velocidades e mantem dentro de uma range
 void getSpeeds() {
-  
+
   speedLeft = initSpeedLeft + pd;
   speedRight = initSpeedRight - pd;
-  speedLeft = constrain(speedLeft, 10, 254);
-  speedRight = constrain(speedRight, 10, 254);
+  speedLeft = constrain(speedLeft, 0, 254);
+  speedRight = constrain(speedRight, 0, 254);
 
   analogWrite(portFrontLeft, speedLeft);
   analogWrite(portBackLeft, 0);
   analogWrite(portFrontRight, speedRight);
   analogWrite(portBackRight, 0);
 }
+
+void invertSpeed() {
+  if (speedLeft == 0 && speedRight != 0) {
+    analogWrite(portFrontLeft, 0);
+    analogWrite(portBackLeft, initSpeedRight);
+  }
+
+  if (speedRight == 0 && speedLeft != 0 ) {
+    analogWrite(portFrontRight, 0);
+    analogWrite(portBackRight, initSpeedLeft);
+  }
+
+}
+
+//Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
+void printData() {
+  Serial.print(speedLeft);
+  Serial.print(" ");
+  Serial.print(globalError);
+  Serial.print(" ");
+  Serial.print(speedRight);
+  Serial.println();
+}
+
+
