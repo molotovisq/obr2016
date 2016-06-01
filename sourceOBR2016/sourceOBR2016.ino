@@ -28,8 +28,12 @@ float pd;
 //Variaveis que armazenam a velocidade de cada roda (PD)
 int speedLeft, speedRight;
 
+//Constantes que armazenam as velocidades iniciais
 const int initSpeedLeft = 100;
 const int initSpeedRight = 100;
+
+//Limiar para inverter o sentido das rodas
+const int limiarToInvert = 10;
 
 void setup() {
   Serial.begin(9600);
@@ -101,15 +105,16 @@ void getSpeeds() {
   analogWrite(portBackRight, 0);
 }
 
+//Função que inverte o sentido de giro das rodas quando sua velocidade chega a 0
 void invertSpeed() {
-  if (speedLeft == 0 && speedRight != 0) {
+  if (speedLeft <= limiarToInvert && speedRight != 0) {
     analogWrite(portFrontLeft, 0);
-    analogWrite(portBackLeft, initSpeedRight);
+    analogWrite(portBackLeft, initSpeedRight + (speedRight / 4));
   }
 
-  if (speedRight == 0 && speedLeft != 0 ) {
+  if (speedRight <= limiarToInvert && speedLeft != 0 ) {
     analogWrite(portFrontRight, 0);
-    analogWrite(portBackRight, initSpeedLeft);
+    analogWrite(portBackRight, initSpeedLeft + (speedLeft / 4));
   }
 
 }
