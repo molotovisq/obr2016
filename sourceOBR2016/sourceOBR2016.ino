@@ -64,6 +64,7 @@ int specialCase;
 //Contador que será iterado enquanto o specialCase for supostamente igual a 0
 int specialCaseCounted;
 
+float distanceFront;
 void setup() {
   Serial.begin(9600);
   //Inicialização das portas dos servos
@@ -71,8 +72,11 @@ void setup() {
   armServo.attach(9);
 
   //Inicialização das posições
-  handServo.write(105);
-  armServo.write(180);
+  servoMove('i');
+
+  //distanceFront
+  pinMode(53, INPUT);
+  pinMode(52, OUTPUT);
 }
 
 void loop() {
@@ -83,7 +87,7 @@ void loop() {
   getSimpleSensorValue();
   getSpecialCase();
   doSpecialCase();
-
+  lineUpdateDistances();
   if (specialCase == 0) {
     getSpeeds();
     invertSpeed();
@@ -263,22 +267,32 @@ float getDistance(int trigPin, int echoPin) {
   return distance;
 }
 
-void getServoMove(char movementType) {
+float lineUpdateDistances() {
+  distanceFront = getDistance(52, 53);
+}
+
+void servoMove(char movementType) {
 
   switch (movementType) {
     //close
     case 'c':
-      handServoPosition = 180;
+      for (int i = 105; i < 180; i++) {
+        handServoPosition = i;
+      }
       break;
     //open
     case 'o':
-      handServoPosition = 105;
+      for (int i = 180; i > 105; i--) {
+        handServoPosition = i;
+      }
       break;
     //down
     case 'd':
       //Checagem feita para que o braço não gire com a mão aberta
       if (handServoPosition == 180) {
-        armServoPosition = 0;
+        for (int i = 180; i > 105; i--) {
+          armServoPosition = i;
+        }
       } else {
         Serial.println("ERROR, A MAO CORRE PERIGO DE DANO");
       }
@@ -287,16 +301,31 @@ void getServoMove(char movementType) {
     case 'u':
       //Checagem feita para que o braço não gire com a mão aberta
       if (handServoPosition == 180) {
-        armServoPosition = 180;
+        for (int i = 0; i < 180; i++) {
+          armServoPosition = i;
+        }
       } else {
         Serial.println("ERROR, A MAO CORRE PERIGO DE DANO");
+      }
+      break;
+
+    case 'i':
+      for (int i = 105; i < 180; i++) {
+        handServoPosition = i;
+      }
+
+      for (int i = 0; i < 180; i++) {
+        armServoPosition = i;
+      }
+
+      for (int i = 180; i > 100; i--) {
+        handServoPosition = i;
       }
       break;
   }
   handServo.write(handServoPosition);
   armServo.write(armServoPosition);
 }
-
 
 
 
@@ -309,6 +338,8 @@ void printData() {
   Serial.print(speedRight);
   Serial.print(" ");
   Serial.print(specialCase);
+  Serial.print(" ");
+  Serial.print(distanceFront);
   Serial.println();
 }
 
