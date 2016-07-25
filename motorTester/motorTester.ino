@@ -20,6 +20,6 @@ void loop() {
   }
 
   if (port == maxRange)
-    port == minRange;
+    port = minRange;
 
 }

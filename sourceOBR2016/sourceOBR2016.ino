@@ -1,8 +1,14 @@
+#include <Servo.h>
+
 //Portas dos motores DC
 const int portBackRight = 4;
 const int portFrontRight = 5;
 const int portBackLeft = 6;
 const int portFrontLeft = 7;
+
+//Portas dos servos motores
+const int portHand = 9;
+const int portArm = 10;
 
 //Constantes para as portas e quantidade de sensores de linha
 const int quantityOfSensors = 8;
@@ -11,8 +17,19 @@ const int sensorPort[quantityOfSensors] = {A7, A6, A5, A4, A3, A2, A1, A0};
 //Vetor que armazena os valores dos sensores de linha
 int sensorValue[quantityOfSensors];
 
+//Armazenamento das posicoes dos servos
+int handServoPosition = 180; //fechar = 180 - abrir = 105
+int armServoPosition = 0; //em baixo = 0 - em cima = 180
+
+//Criação dos objetos Servo
+Servo handServo;
+Servo armServo;
+
 //Limiar entre o preto e o branco
-const int blackLimit = 650;
+const int blackLimit = 700;
+const int whiteLimit = 100;
+const int maxGreenLimit = blackLimit - 50;
+const int minGreenLimit = whiteLimit + 50;
 
 //Variaveis de error (PD)
 int globalError;
@@ -29,22 +46,48 @@ float pd;
 int speedLeft, speedRight;
 
 //Constantes que armazenam as velocidades iniciais
-const int initSpeedLeft = 100;
-const int initSpeedRight = 100;
+const int initSpeedLeft = 75;
+const int initSpeedRight = 75;
+const int globalInitSpeed = 100;
 
 //Limiar para inverter o sentido das rodas
 const int limiarToInvert = 10;
 
+//Vetor que armazena os estados dos sensores de refletancia de um modo simplificado
+//Padrao: 0 = Branco, 1 = preto, 2 = verde, 3 = cinza
+int simpSensorValue[quantityOfSensors];
+
+//Inteira que é setada verdadeira quando algum caso especial de linha é acionado
+//Padrao: -1 Curva a direita, -2 Verde a direita, 0 Nenhum caso especial, 1 Curva a esquerda, 2 Verde a direita.
+int specialCase;
+
+//Contador que será iterado enquanto o specialCase for supostamente igual a 0
+int specialCaseCounted;
+
 void setup() {
   Serial.begin(9600);
+  //Inicialização das portas dos servos
+  handServo.attach(8);
+  armServo.attach(9);
+
+  //Inicialização das posições
+  handServo.write(105);
+  armServo.write(180);
 }
 
 void loop() {
   getSensorValues();
   globalError = readLine(sensorValue, quantityOfSensors);
   pd = calculatePD(globalError, lastGlobalError);
-  getSpeeds();
-  invertSpeed();
+
+  getSimpleSensorValue();
+  getSpecialCase();
+  doSpecialCase();
+
+  if (specialCase == 0) {
+    getSpeeds();
+    invertSpeed();
+  }
   printData();
 
 }
@@ -118,6 +161,144 @@ void invertSpeed() {
   }
 
 }
+//Funcao de movimentos primarios
+//Padrao: f - Front, b - Back, l - Left, r - Right
+void movement(char movementType) {
+
+  switch (movementType) {
+    case 'f':
+      analogWrite(portFrontLeft, globalInitSpeed);
+      analogWrite(portFrontRight, globalInitSpeed);
+      analogWrite(portBackLeft, 0);
+      analogWrite(portBackRight, 0);
+      break;
+
+    case 'b':
+      analogWrite(portFrontLeft, 0);
+      analogWrite(portFrontRight, 0);
+      analogWrite(portBackLeft, globalInitSpeed);
+      analogWrite(portBackRight, globalInitSpeed);
+      break;
+
+    case 'l':
+      analogWrite(portFrontLeft, 0);
+      analogWrite(portFrontRight, globalInitSpeed);
+      analogWrite(portBackLeft, globalInitSpeed + 50);
+      analogWrite(portBackRight, 0);
+      break;
+
+    case 'r':
+      analogWrite(portFrontLeft, globalInitSpeed);
+      analogWrite(portFrontRight, 0);
+      analogWrite(portBackLeft, 0);
+      analogWrite(portBackRight, globalInitSpeed + 50);
+      break;
+  }
+}
+
+//Funcao que simplifica os valores dos sensores e os armazena num vetor de inteiros
+void getSimpleSensorValue() {
+  for (int i = 0; i < quantityOfSensors; i++) {
+
+    if (sensorValue[i] > blackLimit) {
+      simpSensorValue[i] = 1;
+
+    } else {
+      simpSensorValue[i] = 0;
+    }
+  }
+}
+
+//Funcao que seta o valor de specialCase para o tipo de caso especial que o robo esta tratando
+void getSpecialCase() {
+  //11xxxx00
+  if (simpSensorValue[0] == 1 && simpSensorValue[1] == 1 && simpSensorValue[6] == 0 && simpSensorValue[7] == 0) {
+    specialCase = -1;
+  }
+
+  //00xxxx11
+  else if (simpSensorValue[0] == 0 && simpSensorValue[1] == 0 && simpSensorValue[6] == 1 && simpSensorValue[7] == 1) {
+    specialCase = 1;
+  }
+  else {
+    specialCase = 0;
+  }
+}
+
+//Funcao que transforma um caso especial em sua solucao
+void doSpecialCase() {
+  switch (specialCase) {
+    case -1:
+      leftDegCurve();
+      break;
+
+    case 1:
+      rightDegCurve();
+      break;
+
+  }
+}
+
+//(Encoders!!!)
+void leftDegCurve() {
+  movement('l');
+}
+
+//(Encoders!!!)
+void rightDegCurve() {
+  movement('r');
+}
+
+float getDistance(int trigPin, int echoPin) {
+  float duration, distance;
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH, 7000); // 7000 Delay Microsseconds to limit range
+
+  distance = (duration / (float)2) / 29.1;
+
+  return distance;
+}
+
+void getServoMove(char movementType) {
+
+  switch (movementType) {
+    //close
+    case 'c':
+      handServoPosition = 180;
+      break;
+    //open
+    case 'o':
+      handServoPosition = 105;
+      break;
+    //down
+    case 'd':
+      //Checagem feita para que o braço não gire com a mão aberta
+      if (handServoPosition == 180) {
+        armServoPosition = 0;
+      } else {
+        Serial.println("ERROR, A MAO CORRE PERIGO DE DANO");
+      }
+      break;
+    //up
+    case 'u':
+      //Checagem feita para que o braço não gire com a mão aberta
+      if (handServoPosition == 180) {
+        armServoPosition = 180;
+      } else {
+        Serial.println("ERROR, A MAO CORRE PERIGO DE DANO");
+      }
+      break;
+  }
+  handServo.write(handServoPosition);
+  armServo.write(armServoPosition);
+}
+
+
+
 
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
@@ -126,6 +307,8 @@ void printData() {
   Serial.print(globalError);
   Serial.print(" ");
   Serial.print(speedRight);
+  Serial.print(" ");
+  Serial.print(specialCase);
   Serial.println();
 }
 

@@ -8,7 +8,8 @@ void setup() {
   Serial.begin(9600);
 }
 
-void loop() {
+
+void loop(){
   for (int i = 0; i < quantityOfSensors; i++) {
     sensorValue[i] = analogRead(sensorPort[i]);
   }
