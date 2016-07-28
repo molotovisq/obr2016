@@ -1,10 +1,18 @@
 #include <Servo.h>
 
+
+//Adquire o tempo em millisegundos de execução do sistema
+unsigned long int globalTime;
+
 //Portas dos motores DC
 const int portBackRight = 4;
 const int portFrontRight = 5;
 const int portBackLeft = 6;
 const int portFrontLeft = 7;
+
+//Portas dos Encoders
+const int portLeftEncoder = A14;
+const int portRightEncoder = A15;
 
 //Portas dos servos motores
 const int portHand = 9;
@@ -46,8 +54,8 @@ float pd;
 int speedLeft, speedRight;
 
 //Constantes que armazenam as velocidades iniciais
-const int initSpeedLeft = 100;
-const int initSpeedRight = 100;
+const int initSpeedLeft = 0;
+const int initSpeedRight = 0;
 const int globalInitSpeed = 100;
 
 //Limiar para inverter o sentido das rodas
@@ -61,8 +69,23 @@ int simpSensorValue[quantityOfSensors];
 //Padrao: -1 Curva a direita, -2 Verde a direita, 0 Nenhum caso especial, 1 Curva a esquerda, 2 Verde a direita.
 int specialCase;
 
-//Contador que será iterado enquanto o specialCase for supostamente igual a 0
-int specialCaseCounted;
+//Refletancia do encoder
+int leftEncoderRefletance;
+int rightEncoderRefletance;
+
+//Estado e ultimo estado do encoder
+bool leftEncoderState;
+bool lastLeftEncoderState;
+
+bool rightEncoderState;
+bool lastRightEncoderState;
+
+int encoderRefletanceLimiar = 500;
+
+int encoderTimeCounter;
+
+long int leftEncoderPulses;
+long int rightEncoderPulses;
 
 float distanceFront;
 void setup() {
@@ -76,41 +99,38 @@ void setup() {
   //nsei
   pinMode(23, OUTPUT);
   pinMode(22, INPUT);
-  //distanceFront 
+  //distanceFront
   pinMode(53, OUTPUT);
   pinMode(52, INPUT);
 }
 
 void loop() {
-  //Aadquire os dados dos sensores de linha
+  getGlobalTime();
   getLineSensorValues();
-  
-  //Transforma os dados dos sensores de linha em informação derivada e proporcional á distancia da linha
   globalError = readLine(sensorValue, quantityOfSensors);
   pd = calculatePD(globalError, lastGlobalError);
-
-  //Transforma os dados analogicos em representação digital dos sensores (0 pra branco e 1 pra preto)
   getSimpleSensorValue();
-
-  //Transforma as representações digitais em seus respectivos casos especiais (-1 e 1 para curva de 90graus, -2 e 2 para verde, 3 para desvio de obstáculo)
   getSpecialCase();
-
-  //Executa as rotinas referentes aos casos especiais 
   doSpecialCase();
-
-  //Adquire as distancias necessárias á etapa de seguir linha (Sensor Frontal)
   getLineDistances();
 
-  //Quando não se está num caso especial, é executado o seguidor de linha simples (PD)
-  if (specialCase == 0) {
-    getSpeeds();
-    invertSpeed();
-  }
 
-  //Função para printar os dados necessários (Colocar parametros para recepção de variáveis !@!)
+  if (specialCase == 0) {
+    //getSpeeds();
+    //invertSpeed();
+  }
+  getEncodersRefletance();
+  getEncodersState();
+  getEncodersPulse();
   printData();
 
 }
+
+
+void getGlobalTime() {
+  globalTime = millis();
+}
+
 
 // Leitura dos valores dos sensores e armazenamento no vetor "sensorValues[]"
 void getLineSensorValues() {
@@ -269,6 +289,7 @@ void rightDegCurve() {
   movement('r');
 }
 
+
 float getDistance(int trigPin, int echoPin) {
   float duration, distance;
   digitalWrite(trigPin, LOW);
@@ -283,7 +304,7 @@ float getDistance(int trigPin, int echoPin) {
   return distance;
 }
 
-float lineUpdateDistances() {
+float getLineDistances() {
   distanceFront = getDistance(52, 53);
 }
 
@@ -343,8 +364,56 @@ void servoMove(char movementType) {
   armServo.write(armServoPosition);
 }
 
+void getEncodersRefletance() {
+  leftEncoderRefletance = analogRead(portLeftEncoder);
+  rightEncoderRefletance = analogRead(portRightEncoder);
+}
+
+void getEncodersState() {
+  if (leftEncoderRefletance > encoderRefletanceLimiar) {
+    encoderTimeCounter++;
+    if (encoderTimeCounter > 10) {
+      leftEncoderState = 1;
+      encoderTimeCounter = 0;
+    }
+  } else {
+    encoderTimeCounter++;
+    if (encoderTimeCounter > 10) {
+      leftEncoderState = 0;
+      encoderTimeCounter = 0;
+    }
+  }
+
+  if (rightEncoderRefletance > encoderRefletanceLimiar) {
+    encoderTimeCounter++;
+    if (encoderTimeCounter > 10) {
+      rightEncoderState = 1;
+      encoderTimeCounter = 0;
+    }
+  } else {
+    encoderTimeCounter++;
+    if (encoderTimeCounter > 10) {
+      rightEncoderState = 0;
+      encoderTimeCounter = 0;
+    }
+  }
+}
+
+void getEncodersPulse(){
+  if(leftEncoderState != lastLeftEncoderState){
+      leftEncoderPulses++;
+    }
+  if(rightEncoderState != lastRightEncoderState){
+    rightEncoderPulses++;
+  }
+
+lastLeftEncoderState = leftEncoderState;
+lastRightEncoderState = rightEncoderState;
+  
+  }
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
+
   Serial.print(speedLeft);
   Serial.print(" ");
   Serial.print(globalError);
@@ -353,7 +422,11 @@ void printData() {
   Serial.print(" ");
   Serial.print(specialCase);
   Serial.print(" ");
-  Serial.print(distanceFront);
+  Serial.print(rightEncoderRefletance);
+  Serial.print(" ");
+  Serial.print(rightEncoderState);
+  Serial.print(" ");
+  Serial.print(rightEncoderPulses);
   Serial.println();
 }
 
