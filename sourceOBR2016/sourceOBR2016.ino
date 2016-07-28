@@ -269,6 +269,7 @@ void rightDegCurve() {
   movement('r');
 }
 
+//Função que adiquire a distancia, by Flalves
 float getDistance(int trigPin, int echoPin) {
   float duration, distance;
   digitalWrite(trigPin, LOW);
@@ -282,7 +283,7 @@ float getDistance(int trigPin, int echoPin) {
 
   return distance;
 }
-
+//Função que gera as distancias
 float lineUpdateDistances() {
   distanceFront = getDistance(52, 53);
 }
