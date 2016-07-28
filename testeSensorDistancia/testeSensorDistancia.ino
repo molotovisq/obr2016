@@ -1,11 +1,17 @@
 void setup() {
-  pinMode(53, INPUT);
-  pinMode(52, OUTPUT);
+  pinMode(23, OUTPUT);
+  pinMode(22, INPUT);
+  pinMode(53, OUTPUT);
+  pinMode(52, INPUT);
+
   Serial.begin(9600);
 }
 
 void loop() {
-Serial.println(getDistance(52,53));
+  Serial.print(getDistance(23, 22));
+  Serial.print("  ");
+  Serial.print(getDistance(53, 52));
+  Serial.println("  ");
 
 }
 

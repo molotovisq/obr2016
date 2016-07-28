@@ -1,10 +1,11 @@
 ﻿Admins
 José Marcolino
-Leonardo Marques
+Antonio José
 
 Developers
 Antonio José
-Islan Victor
+José Marcolino
+Luiz Fernando
 
 Advisors
 Hernandes Erick

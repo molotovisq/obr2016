@@ -46,8 +46,8 @@ float pd;
 int speedLeft, speedRight;
 
 //Constantes que armazenam as velocidades iniciais
-const int initSpeedLeft = 75;
-const int initSpeedRight = 75;
+const int initSpeedLeft = 100;
+const int initSpeedRight = 100;
 const int globalInitSpeed = 100;
 
 //Limiar para inverter o sentido das rodas
@@ -73,31 +73,47 @@ void setup() {
 
   //Inicialização das posições
   servoMove('i');
-
-  //distanceFront
-  pinMode(53, INPUT);
-  pinMode(52, OUTPUT);
+  //nsei
+  pinMode(23, OUTPUT);
+  pinMode(22, INPUT);
+  //distanceFront 
+  pinMode(53, OUTPUT);
+  pinMode(52, INPUT);
 }
 
 void loop() {
-  getSensorValues();
+  //Aadquire os dados dos sensores de linha
+  getLineSensorValues();
+  
+  //Transforma os dados dos sensores de linha em informação derivada e proporcional á distancia da linha
   globalError = readLine(sensorValue, quantityOfSensors);
   pd = calculatePD(globalError, lastGlobalError);
 
+  //Transforma os dados analogicos em representação digital dos sensores (0 pra branco e 1 pra preto)
   getSimpleSensorValue();
+
+  //Transforma as representações digitais em seus respectivos casos especiais (-1 e 1 para curva de 90graus, -2 e 2 para verde, 3 para desvio de obstáculo)
   getSpecialCase();
+
+  //Executa as rotinas referentes aos casos especiais 
   doSpecialCase();
-  lineUpdateDistances();
+
+  //Adquire as distancias necessárias á etapa de seguir linha (Sensor Frontal)
+  getLineDistances();
+
+  //Quando não se está num caso especial, é executado o seguidor de linha simples (PD)
   if (specialCase == 0) {
     getSpeeds();
     invertSpeed();
   }
+
+  //Função para printar os dados necessários (Colocar parametros para recepção de variáveis !@!)
   printData();
 
 }
 
 // Leitura dos valores dos sensores e armazenamento no vetor "sensorValues[]"
-void getSensorValues() {
+void getLineSensorValues() {
   for (int i = 0; i < quantityOfSensors; i++) {
     sensorValue[i] = analogRead(sensorPort[i]);
   }
@@ -326,8 +342,6 @@ void servoMove(char movementType) {
   handServo.write(handServoPosition);
   armServo.write(armServoPosition);
 }
-
-
 
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
