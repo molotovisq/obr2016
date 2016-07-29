@@ -399,7 +399,11 @@ void backControlled(int pulses) {
 
 }
 
+<<<<<<< HEAD
 
+=======
+//Função que adiquire a distancia, by Flalves
+>>>>>>> 18ba624f859be44818d2c2ccff2a71515d97d50d
 float getDistance(int trigPin, int echoPin) {
   float duration, distance;
   digitalWrite(trigPin, LOW);
@@ -413,9 +417,15 @@ float getDistance(int trigPin, int echoPin) {
 
   return distance;
 }
+<<<<<<< HEAD
 
 float getLineDistances() {
   distanceFront = getDistance(triggerDistanceFront, echoDistanceFront);
+=======
+//Função que gera as distancias
+float lineUpdateDistances() {
+  distanceFront = getDistance(52, 53);
+>>>>>>> 18ba624f859be44818d2c2ccff2a71515d97d50d
 }
 
 void turnObstacle(){
