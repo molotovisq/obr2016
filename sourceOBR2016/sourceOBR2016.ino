@@ -44,7 +44,7 @@ int globalError;
 int lastGlobalError;
 
 //Constantes de proporcionalidade e derivação
-const float kP = 17.8;
+const float kP = 19;
 const float kD = 4;
 
 //Variavel que armazena o valor da proporcional derivativa
@@ -54,19 +54,19 @@ float pd;
 int speedLeft, speedRight;
 
 //Constantes que armazenam as velocidades iniciais
-const int initSpeedLeft = 0;
-const int initSpeedRight = 0;
+const int initSpeedLeft = 100;
+const int initSpeedRight = 100;
 const int globalInitSpeed = 100;
 
 //Limiar para inverter o sentido das rodas
-const int limiarToInvert = 10;
+const int limiarToInvert = 20;
 
 //Vetor que armazena os estados dos sensores de refletancia de um modo simplificado
 //Padrao: 0 = Branco, 1 = preto, 2 = verde, 3 = cinza
 int simpSensorValue[quantityOfSensors];
 
 //Inteira que é setada verdadeira quando algum caso especial de linha é acionado
-//Padrao: -1 Curva a direita, -2 Verde a direita, 0 Nenhum caso especial, 1 Curva a esquerda, 2 Verde a direita.
+//Padrao: -1 Curva a direita, -2 Verde a direita, 0 Nenhum caso especial, 1 Curva a esquerda, 2 Verde a direita. 3 = OBSTACULO
 int specialCase;
 
 //Refletancia do encoder
@@ -87,6 +87,18 @@ int encoderTimeCounter;
 long int leftEncoderPulses;
 long int rightEncoderPulses;
 
+const int ninetyDegPulses = 4;
+const int frontDegPulses = 3;
+
+int lastLeftEncoderPulses;
+int lastRightEncoderPulses;
+
+bool leftMotorDirection;
+bool rightMotorDirection;
+
+const int triggerDistanceFront = 53;
+const int echoDistanceFront = 52;
+
 float distanceFront;
 void setup() {
   Serial.begin(9600);
@@ -96,15 +108,13 @@ void setup() {
 
   //Inicialização das posições
   servoMove('i');
-  //nsei
-  pinMode(23, OUTPUT);
-  pinMode(22, INPUT);
   //distanceFront
-  pinMode(53, OUTPUT);
-  pinMode(52, INPUT);
+  pinMode(triggerDistanceFront, OUTPUT);
+  pinMode(echoDistanceFront, INPUT);
 }
 
 void loop() {
+
   getGlobalTime();
   getLineSensorValues();
   globalError = readLine(sensorValue, quantityOfSensors);
@@ -116,8 +126,8 @@ void loop() {
 
 
   if (specialCase == 0) {
-    //getSpeeds();
-    //invertSpeed();
+    getSpeeds();
+    invertSpeed();
   }
   getEncodersRefletance();
   getEncodersState();
@@ -186,6 +196,7 @@ void getSpeeds() {
   analogWrite(portBackLeft, 0);
   analogWrite(portFrontRight, speedRight);
   analogWrite(portBackRight, 0);
+  setMotorDirection(1, 1);
 }
 
 //Função que inverte o sentido de giro das rodas quando sua velocidade chega a 0
@@ -193,11 +204,13 @@ void invertSpeed() {
   if (speedLeft <= limiarToInvert && speedRight != 0) {
     analogWrite(portFrontLeft, 0);
     analogWrite(portBackLeft, initSpeedRight + (speedRight / 4));
+    setMotorDirection(0, 1);
   }
 
   if (speedRight <= limiarToInvert && speedLeft != 0 ) {
     analogWrite(portFrontRight, 0);
     analogWrite(portBackRight, initSpeedLeft + (speedLeft / 4));
+    setMotorDirection(1, 0);
   }
 
 }
@@ -211,6 +224,7 @@ void movement(char movementType) {
       analogWrite(portFrontRight, globalInitSpeed);
       analogWrite(portBackLeft, 0);
       analogWrite(portBackRight, 0);
+      setMotorDirection(1, 1);
       break;
 
     case 'b':
@@ -218,6 +232,7 @@ void movement(char movementType) {
       analogWrite(portFrontRight, 0);
       analogWrite(portBackLeft, globalInitSpeed);
       analogWrite(portBackRight, globalInitSpeed);
+      setMotorDirection(0, 0);
       break;
 
     case 'l':
@@ -225,6 +240,7 @@ void movement(char movementType) {
       analogWrite(portFrontRight, globalInitSpeed);
       analogWrite(portBackLeft, globalInitSpeed + 50);
       analogWrite(portBackRight, 0);
+      setMotorDirection(0, 1);
       break;
 
     case 'r':
@@ -232,6 +248,7 @@ void movement(char movementType) {
       analogWrite(portFrontRight, 0);
       analogWrite(portBackLeft, 0);
       analogWrite(portBackRight, globalInitSpeed + 50);
+      setMotorDirection(1, 0);
       break;
   }
 }
@@ -260,6 +277,11 @@ void getSpecialCase() {
   else if (simpSensorValue[0] == 0 && simpSensorValue[1] == 0 && simpSensorValue[6] == 1 && simpSensorValue[7] == 1) {
     specialCase = 1;
   }
+
+  else if(distanceFront < 13 && distanceFront != 0){
+    specialCase = 3;
+    }
+    
   else {
     specialCase = 0;
   }
@@ -270,23 +292,111 @@ void doSpecialCase() {
   switch (specialCase) {
     case -1:
       leftDegCurve();
+      movement('l');
       break;
 
     case 1:
-      rightDegCurve();
+      //rightDegCurve();
+      movement('r');
+      break;
+
+    case 3:
+      turnObstacle();
       break;
 
   }
 }
 
-//(Encoders!!!)
+//(Encoders!!!) Encoderadas
 void leftDegCurve() {
-  movement('l');
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('l');
+  }  while (lastLeftEncoderPulses != leftEncoderPulses + ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses - ninetyDegPulses);
+  frontDeg();
 }
 
-//(Encoders!!!)
+//(Encoders!!!) Encoderadas
 void rightDegCurve() {
-  movement('r');
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('r');
+  } while (lastLeftEncoderPulses != leftEncoderPulses - ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses + ninetyDegPulses);
+  frontDeg();
+}
+
+void frontDeg() {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('f');
+  } while (lastLeftEncoderPulses != leftEncoderPulses - frontDegPulses && lastRightEncoderPulses != rightEncoderPulses - frontDegPulses);
+}
+
+void frontControlled(int pulses) {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('f');
+  } while (lastLeftEncoderPulses != leftEncoderPulses - pulses && lastRightEncoderPulses != rightEncoderPulses - pulses);
+
+}
+
+void leftControlled(int pulses) {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('l');
+  }  while (lastLeftEncoderPulses != leftEncoderPulses + pulses && lastRightEncoderPulses != rightEncoderPulses - pulses);
+
+}
+
+void rightControlled(int pulses) {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('r');
+  } while (lastLeftEncoderPulses != leftEncoderPulses - pulses && lastRightEncoderPulses != rightEncoderPulses + pulses);
+
+}
+
+void backControlled(int pulses) {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('b');
+  } while (lastLeftEncoderPulses != leftEncoderPulses + pulses && lastRightEncoderPulses != rightEncoderPulses + pulses);
+
 }
 
 
@@ -305,8 +415,20 @@ float getDistance(int trigPin, int echoPin) {
 }
 
 float getLineDistances() {
-  distanceFront = getDistance(52, 53);
+  distanceFront = getDistance(triggerDistanceFront, echoDistanceFront);
 }
+
+void turnObstacle(){
+  backControlled(3);//ok
+  rightControlled(8);//ok
+  frontControlled(14);
+  leftControlled(11);//ok
+  frontControlled(30);
+  leftControlled(11);
+  frontControlled(15);
+  rightControlled(6);
+  backControlled(1);
+  }
 
 void servoMove(char movementType) {
 
@@ -399,18 +521,33 @@ void getEncodersState() {
   }
 }
 
-void getEncodersPulse(){
-  if(leftEncoderState != lastLeftEncoderState){
+//Itera o pulso dos sensores (colocar a diminuição do pulso para tras.)
+void getEncodersPulse() {
+  if (leftEncoderState != lastLeftEncoderState) {
+    if (leftMotorDirection == true) {
       leftEncoderPulses++;
+    } else {
+      leftEncoderPulses--;
     }
-  if(rightEncoderState != lastRightEncoderState){
-    rightEncoderPulses++;
   }
+  if (rightEncoderState != lastRightEncoderState) {
+    if (rightMotorDirection == true) {
+      rightEncoderPulses++;
+    } else {
+      rightEncoderPulses--;
+    }
+  }
+  lastLeftEncoderState = leftEncoderState;
+  lastRightEncoderState = rightEncoderState;
 
-lastLeftEncoderState = leftEncoderState;
-lastRightEncoderState = rightEncoderState;
-  
-  }
+}
+
+//Seta a direção dos motores (1 - frente, 0 - tras)
+void setMotorDirection(bool directionLeft, bool directionRight) {
+  leftMotorDirection = directionLeft;
+  rightMotorDirection = directionRight;
+}
+
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
 
@@ -422,11 +559,26 @@ void printData() {
   Serial.print(" ");
   Serial.print(specialCase);
   Serial.print(" ");
-  Serial.print(rightEncoderRefletance);
-  Serial.print(" ");
-  Serial.print(rightEncoderState);
-  Serial.print(" ");
-  Serial.print(rightEncoderPulses);
+  Serial.print("Distance Front: ");
+  Serial.print(distanceFront);
+  /*
+    Serial.print(leftMotorDirection);
+    Serial.print(" ");
+    Serial.print(leftEncoderRefletance);
+    Serial.print(" ");
+    Serial.print(leftEncoderState);
+    Serial.print(" ");
+    Serial.print(leftEncoderPulses);
+
+    Serial.print(" ");
+    Serial.print(rightEncoderRefletance);
+    Serial.print(" ");
+    Serial.print(rightEncoderState);
+    Serial.print(" ");
+    Serial.print(rightEncoderPulses);
+    Serial.print(" ");
+    Serial.print(rightMotorDirection);
+  */
   Serial.println();
 }
 
