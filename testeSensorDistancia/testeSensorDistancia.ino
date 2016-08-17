@@ -1,16 +1,23 @@
+int frontSensorTrigger = 53;
+int frontSensorEcho = 54;
+
+int sideSensorTrigger = 23;
+int sideSensorEcho = 24;
+
+
 void setup() {
-  pinMode(23, OUTPUT);
-  pinMode(22, INPUT);
-  pinMode(53, OUTPUT);
-  pinMode(52, INPUT);
+  pinMode(frontSensorTrigger, OUTPUT);
+  pinMode(frontSensorEcho, INPUT);
+  pinMode(sideSensorTrigger, OUTPUT);
+  pinMode(sideSensorEcho, INPUT);
 
   Serial.begin(9600);
 }
 
 void loop() {
-  Serial.print(getDistance(23, 22));
+  Serial.print(getDistance(frontSensorTrigger, frontSensorEcho));
   Serial.print("  ");
-  Serial.print(getDistance(53, 52));
+  Serial.print(getDistance(sideSensorTrigger, sideSensorEcho));
   Serial.println("  ");
 
 }

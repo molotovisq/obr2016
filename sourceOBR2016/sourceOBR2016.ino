@@ -36,8 +36,10 @@ Servo armServo;
 //Limiar entre o preto e o branco
 const int blackLimit = 700;
 const int whiteLimit = 100;
-const int maxGreenLimit = blackLimit - 50;
-const int minGreenLimit = whiteLimit + 50;
+const int maxGreenLimit = blackLimit - 120;
+const int minGreenLimit = whiteLimit + 90;
+const int maxGrayLimit = 0;
+const int minGrayLimit = 0;
 
 //Variaveis de error (PD)
 int globalError;
@@ -73,33 +75,53 @@ int specialCase;
 int leftEncoderRefletance;
 int rightEncoderRefletance;
 
-//Estado e ultimo estado do encoder
+//Estado e ultimo estado dos encoders (Direita e Esquerda)
 bool leftEncoderState;
 bool lastLeftEncoderState;
-
 bool rightEncoderState;
 bool lastRightEncoderState;
 
+//Limiar de refletancia do encoder
 int encoderRefletanceLimiar = 500;
 
+//Variavel que conta o tempo que está num estado do encoder
 int encoderTimeCounter;
 
+//Quantidade total de pulsos
 long int leftEncoderPulses;
 long int rightEncoderPulses;
 
-const int ninetyDegPulses = 4;
-const int frontDegPulses = 3;
+//Pulsos necessarios para curvas:
 
+//90Graus
+const int ninetyDegPulses = 4;
+
+//Frente, 90Graus
+const int frontDegPulses = 2;
+
+//Frente, Verde
+const int frontGreenPulses = 4;
+
+//Ultima quantidade de pulsos dos encoders
 int lastLeftEncoderPulses;
 int lastRightEncoderPulses;
 
+//Direção dos motores
 bool leftMotorDirection;
 bool rightMotorDirection;
 
+//Portas dos sensores de distancia
 const int triggerDistanceFront = 53;
 const int echoDistanceFront = 52;
 
+//Distancia da frente
 float distanceFront;
+
+//Distancia para desviar do obstaculo
+const float turnDistance = 13.0;
+
+bool rescuing = false;
+
 void setup() {
   Serial.begin(9600);
   //Inicialização das portas dos servos
@@ -111,29 +133,35 @@ void setup() {
   //distanceFront
   pinMode(triggerDistanceFront, OUTPUT);
   pinMode(echoDistanceFront, INPUT);
+
+  pinMode(portBackRight, OUTPUT);
 }
 
 void loop() {
-
+if(!rescuing){
   getGlobalTime();
   getLineSensorValues();
   globalError = readLine(sensorValue, quantityOfSensors);
   pd = calculatePD(globalError, lastGlobalError);
   getSimpleSensorValue();
   getSpecialCase();
-  doSpecialCase();
   getLineDistances();
 
 
   if (specialCase == 0) {
     getSpeeds();
     invertSpeed();
-  }
+  } else{
+    doSpecialCase();
+    }
   getEncodersRefletance();
   getEncodersState();
   getEncodersPulse();
   printData();
-
+}else{
+  searchHostage();
+  
+  }
 }
 
 
@@ -253,6 +281,54 @@ void movement(char movementType) {
   }
 }
 
+int getNineDeg() {
+  if (simpSensorValue[0] == 1 && simpSensorValue[1] == 1 && simpSensorValue[6] == 0 && simpSensorValue[7] == 0) {
+    return -1;
+  }
+  else if (simpSensorValue[0] == 0 && simpSensorValue[1] == 0 && simpSensorValue[6] == 1 && simpSensorValue[7] == 1) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
+
+}
+
+int getGreen() {
+  for (int i = 1; i < quantityOfSensors; i++) {
+    if (((sensorValue[i] >= minGreenLimit) && (sensorValue[i] <= maxGreenLimit)) && ((sensorValue[i - 1] >= minGreenLimit) && (sensorValue[i - 1] <= maxGreenLimit))) {
+      if (i <= 3) {
+        return -1;
+      }
+      else if (i >= 4) {
+        return 1;
+      }
+      else
+        return 0;
+    }
+  }
+
+  return 0;
+}
+
+int getGray() {
+  int counter;
+  for (int i; i < quantityOfSensors; i++) {
+    if (simpSensorValue[i] == 4) {
+      counter ++;
+    }
+  }
+  if (counter > 7) {
+    counter = 0;
+    return 1;
+    
+  } else {
+    counter = 0;
+    return 0;
+    
+  }
+}
+
 //Funcao que simplifica os valores dos sensores e os armazena num vetor de inteiros
 void getSimpleSensorValue() {
   for (int i = 0; i < quantityOfSensors; i++) {
@@ -260,28 +336,39 @@ void getSimpleSensorValue() {
     if (sensorValue[i] > blackLimit) {
       simpSensorValue[i] = 1;
 
+    } else if (sensorValue[i] < maxGrayLimit && sensorValue[i] > minGrayLimit) {
+      simpSensorValue[i] = 4;
+
     } else {
       simpSensorValue[i] = 0;
     }
+
   }
 }
 
 //Funcao que seta o valor de specialCase para o tipo de caso especial que o robo esta tratando
 void getSpecialCase() {
   //11xxxx00
-  if (simpSensorValue[0] == 1 && simpSensorValue[1] == 1 && simpSensorValue[6] == 0 && simpSensorValue[7] == 0) {
+  if (getNineDeg() == -1) {
     specialCase = -1;
   }
-
   //00xxxx11
-  else if (simpSensorValue[0] == 0 && simpSensorValue[1] == 0 && simpSensorValue[6] == 1 && simpSensorValue[7] == 1) {
+  else if (getNineDeg() == 1) {
     specialCase = 1;
   }
+  else if (getGreen() == -1) {
+    specialCase = -2;
 
-  else if(distanceFront < 13 && distanceFront != 0){
+  }
+  else if (getGreen() == 1) {
+    specialCase = 2;
+
+  }
+
+  else if (distanceFront < turnDistance && distanceFront != 0) {
     specialCase = 3;
-    }
-    
+  }
+
   else {
     specialCase = 0;
   }
@@ -290,14 +377,28 @@ void getSpecialCase() {
 //Funcao que transforma um caso especial em sua solucao
 void doSpecialCase() {
   switch (specialCase) {
+    case -2:
+      //leftGreenCurve();
+      Serial.println("VERDE DETECTADO - L");
+      leftControlled(4);
+      frontControlled(3);
+      break;
+
     case -1:
-      leftDegCurve();
+      //leftDegCurve();
       movement('l');
       break;
 
     case 1:
       //rightDegCurve();
       movement('r');
+      break;
+
+    case 2:
+      Serial.println("VERDE DETECTADO - R");
+      //rightGreenCurve();
+      rightControlled(4);
+      frontControlled(3);
       break;
 
     case 3:
@@ -345,6 +446,34 @@ void frontDeg() {
     getEncodersPulse();
     movement('f');
   } while (lastLeftEncoderPulses != leftEncoderPulses - frontDegPulses && lastRightEncoderPulses != rightEncoderPulses - frontDegPulses);
+}
+
+
+void leftGreenCurve() {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('l');
+  }  while (lastLeftEncoderPulses != leftEncoderPulses + ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses - ninetyDegPulses);
+  frontDeg();
+}
+
+void rightGreenCurve() {
+  lastLeftEncoderPulses = leftEncoderPulses;
+  lastRightEncoderPulses = rightEncoderPulses;
+
+  do {
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    movement('r');
+  } while (lastLeftEncoderPulses != leftEncoderPulses - ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses + ninetyDegPulses);
+  frontDeg();
+
 }
 
 void frontControlled(int pulses) {
@@ -399,11 +528,11 @@ void backControlled(int pulses) {
 
 }
 
-<<<<<<< HEAD
 
-=======
+
+
 //Função que adiquire a distancia, by Flalves
->>>>>>> 18ba624f859be44818d2c2ccff2a71515d97d50d
+
 float getDistance(int trigPin, int echoPin) {
   float duration, distance;
   digitalWrite(trigPin, LOW);
@@ -417,18 +546,17 @@ float getDistance(int trigPin, int echoPin) {
 
   return distance;
 }
-<<<<<<< HEAD
+
 
 float getLineDistances() {
   distanceFront = getDistance(triggerDistanceFront, echoDistanceFront);
-=======
+}
 //Função que gera as distancias
 float lineUpdateDistances() {
   distanceFront = getDistance(52, 53);
->>>>>>> 18ba624f859be44818d2c2ccff2a71515d97d50d
 }
 
-void turnObstacle(){
+void turnObstacle() {
   backControlled(3);//ok
   rightControlled(8);//ok
   frontControlled(14);
@@ -438,7 +566,7 @@ void turnObstacle(){
   frontControlled(15);
   rightControlled(6);
   backControlled(1);
-  }
+}
 
 void servoMove(char movementType) {
 
@@ -557,6 +685,10 @@ void setMotorDirection(bool directionLeft, bool directionRight) {
   leftMotorDirection = directionLeft;
   rightMotorDirection = directionRight;
 }
+
+void searchHostage(){
+  
+  }
 
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
