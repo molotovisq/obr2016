@@ -135,6 +135,12 @@ void setup() {
   pinMode(echoDistanceFront, INPUT);
 
   pinMode(portBackRight, OUTPUT);
+
+  delay(2000);
+  frontControlled(5);
+  rightControlled(5);
+  leftControlled(5);
+  delay(2000);
 }
 
 void loop() {
@@ -295,7 +301,16 @@ int getNineDeg() {
 }
 
 int getGreen() {
-  
+  if (sensorValue[1] >= minGreenLimit[1] && sensorValue[1] <= maxGreenLimit[1] && sensorValue[2] >= minGreenLimit[2] && sensorValue[2] <= maxGreenLimit[2] && sensorValue[3] >= blackLimit) {
+    return -1;
+  }
+  else if (sensorValue[7] >= minGreenLimit[7] && sensorValue[7] <= maxGreenLimit[7] && sensorValue[6] >= minGreenLimit[6] && sensorValue[6] <= maxGreenLimit[6] && sensorValue[5] >= blackLimit) {
+    return 1;
+  }
+  else{
+  return 0;
+  }
+
 }
 
 int getGray() {
@@ -625,8 +640,8 @@ void printData() {
   Serial.print(globalError);
   Serial.print(" ");
   Serial.print(speedRight);
-  Serial.print(" ");
-  Serial.print(specialCase);
+  Serial.print(" Green: ");
+  Serial.print(getGreen());
   Serial.print(" ");
   Serial.print("Distance Front: ");
   Serial.print(distanceFront);
