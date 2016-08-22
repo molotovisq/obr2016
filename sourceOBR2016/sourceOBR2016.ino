@@ -36,8 +36,8 @@ Servo armServo;
 //Limiar entre o preto e o branco
 const int blackLimit = 700;
 const int whiteLimit = 100;
-const int maxGreenLimit = blackLimit - 120;
-const int minGreenLimit = whiteLimit + 90;
+const int maxGreenLimit[quantityOfSensors] = {550, 550, 550, 550, 550, 190, 450};
+const int minGreenLimit[quantityOfSensors] = {200, 200, 200, 200, 60, 110, 300};
 const int maxGrayLimit = 0;
 const int minGrayLimit = 0;
 
@@ -138,29 +138,29 @@ void setup() {
 }
 
 void loop() {
-if(!rescuing){
-  getGlobalTime();
-  getLineSensorValues();
-  globalError = readLine(sensorValue, quantityOfSensors);
-  pd = calculatePD(globalError, lastGlobalError);
-  getSimpleSensorValue();
-  getSpecialCase();
-  getLineDistances();
+  if (!rescuing) {
+    getGlobalTime();
+    getLineSensorValues();
+    globalError = readLine(sensorValue, quantityOfSensors);
+    pd = calculatePD(globalError, lastGlobalError);
+    getSimpleSensorValue();
+    getSpecialCase();
+    getLineDistances();
+    getEncodersRefletance();
+    getEncodersState();
+    getEncodersPulse();
+    printData();
 
-
-  if (specialCase == 0) {
-    getSpeeds();
-    invertSpeed();
-  } else{
-    doSpecialCase();
+    if (specialCase == 0) {
+      getSpeeds();
+      invertSpeed();
+    } else {
+      doSpecialCase();
     }
-  getEncodersRefletance();
-  getEncodersState();
-  getEncodersPulse();
-  printData();
-}else{
-  searchHostage();
-  
+
+  } else {
+    searchHostage();
+
   }
 }
 
@@ -295,20 +295,7 @@ int getNineDeg() {
 }
 
 int getGreen() {
-  for (int i = 1; i < quantityOfSensors; i++) {
-    if (((sensorValue[i] >= minGreenLimit) && (sensorValue[i] <= maxGreenLimit)) && ((sensorValue[i - 1] >= minGreenLimit) && (sensorValue[i - 1] <= maxGreenLimit))) {
-      if (i <= 3) {
-        return -1;
-      }
-      else if (i >= 4) {
-        return 1;
-      }
-      else
-        return 0;
-    }
-  }
-
-  return 0;
+  
 }
 
 int getGray() {
@@ -321,11 +308,11 @@ int getGray() {
   if (counter > 7) {
     counter = 0;
     return 1;
-    
+
   } else {
     counter = 0;
     return 0;
-    
+
   }
 }
 
@@ -378,10 +365,8 @@ void getSpecialCase() {
 void doSpecialCase() {
   switch (specialCase) {
     case -2:
-      //leftGreenCurve();
       Serial.println("VERDE DETECTADO - L");
-      leftControlled(4);
-      frontControlled(3);
+      movement('l');
       break;
 
     case -1:
@@ -396,9 +381,7 @@ void doSpecialCase() {
 
     case 2:
       Serial.println("VERDE DETECTADO - R");
-      //rightGreenCurve();
-      rightControlled(4);
-      frontControlled(3);
+      movement('r');
       break;
 
     case 3:
@@ -408,33 +391,6 @@ void doSpecialCase() {
   }
 }
 
-//(Encoders!!!) Encoderadas
-void leftDegCurve() {
-  lastLeftEncoderPulses = leftEncoderPulses;
-  lastRightEncoderPulses = rightEncoderPulses;
-
-  do {
-    getEncodersRefletance();
-    getEncodersState();
-    getEncodersPulse();
-    movement('l');
-  }  while (lastLeftEncoderPulses != leftEncoderPulses + ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses - ninetyDegPulses);
-  frontDeg();
-}
-
-//(Encoders!!!) Encoderadas
-void rightDegCurve() {
-  lastLeftEncoderPulses = leftEncoderPulses;
-  lastRightEncoderPulses = rightEncoderPulses;
-
-  do {
-    getEncodersRefletance();
-    getEncodersState();
-    getEncodersPulse();
-    movement('r');
-  } while (lastLeftEncoderPulses != leftEncoderPulses - ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses + ninetyDegPulses);
-  frontDeg();
-}
 
 void frontDeg() {
   lastLeftEncoderPulses = leftEncoderPulses;
@@ -449,32 +405,6 @@ void frontDeg() {
 }
 
 
-void leftGreenCurve() {
-  lastLeftEncoderPulses = leftEncoderPulses;
-  lastRightEncoderPulses = rightEncoderPulses;
-
-  do {
-    getEncodersRefletance();
-    getEncodersState();
-    getEncodersPulse();
-    movement('l');
-  }  while (lastLeftEncoderPulses != leftEncoderPulses + ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses - ninetyDegPulses);
-  frontDeg();
-}
-
-void rightGreenCurve() {
-  lastLeftEncoderPulses = leftEncoderPulses;
-  lastRightEncoderPulses = rightEncoderPulses;
-
-  do {
-    getEncodersRefletance();
-    getEncodersState();
-    getEncodersPulse();
-    movement('r');
-  } while (lastLeftEncoderPulses != leftEncoderPulses - ninetyDegPulses && lastRightEncoderPulses != rightEncoderPulses + ninetyDegPulses);
-  frontDeg();
-
-}
 
 void frontControlled(int pulses) {
   lastLeftEncoderPulses = leftEncoderPulses;
@@ -527,9 +457,6 @@ void backControlled(int pulses) {
   } while (lastLeftEncoderPulses != leftEncoderPulses + pulses && lastRightEncoderPulses != rightEncoderPulses + pulses);
 
 }
-
-
-
 
 //Função que adiquire a distancia, by Flalves
 
@@ -686,9 +613,9 @@ void setMotorDirection(bool directionLeft, bool directionRight) {
   rightMotorDirection = directionRight;
 }
 
-void searchHostage(){
-  
-  }
+void searchHostage() {
+
+}
 
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
