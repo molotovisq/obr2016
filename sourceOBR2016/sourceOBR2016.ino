@@ -36,8 +36,8 @@ Servo armServo;
 //Limiar entre o preto e o branco
 const int blackLimit = 700;
 const int whiteLimit = 100;
-const int maxGreenLimit[quantityOfSensors] = {550, 550, 550, 550, 550, 190, 450};
-const int minGreenLimit[quantityOfSensors] = {200, 200, 200, 200, 60, 110, 300};
+const int maxGreenLimit = 400;
+const int minGreenLimit = 100;
 const int maxGrayLimit = 0;
 const int minGrayLimit = 0;
 
@@ -46,7 +46,7 @@ int globalError;
 int lastGlobalError;
 
 //Constantes de proporcionalidade e derivação
-const float kP = 19;
+const float kP = 21;
 const float kD = 4;
 
 //Variavel que armazena o valor da proporcional derivativa
@@ -61,7 +61,7 @@ const int initSpeedRight = 100;
 const int globalInitSpeed = 100;
 
 //Limiar para inverter o sentido das rodas
-const int limiarToInvert = 20;
+const int limiarToInvert = 40;
 
 //Vetor que armazena os estados dos sensores de refletancia de um modo simplificado
 //Padrao: 0 = Branco, 1 = preto, 2 = verde, 3 = cinza
@@ -136,11 +136,6 @@ void setup() {
 
   pinMode(portBackRight, OUTPUT);
 
-  delay(2000);
-  frontControlled(5);
-  rightControlled(5);
-  leftControlled(5);
-  delay(2000);
 }
 
 void loop() {
@@ -301,17 +296,23 @@ int getNineDeg() {
 }
 
 int getGreen() {
-  if (sensorValue[1] >= minGreenLimit[1] && sensorValue[1] <= maxGreenLimit[1] && sensorValue[2] >= minGreenLimit[2] && sensorValue[2] <= maxGreenLimit[2] && sensorValue[3] >= blackLimit) {
-    return -1;
-  }
-  else if (sensorValue[7] >= minGreenLimit[7] && sensorValue[7] <= maxGreenLimit[7] && sensorValue[6] >= minGreenLimit[6] && sensorValue[6] <= maxGreenLimit[6] && sensorValue[5] >= blackLimit) {
-    return 1;
-  }
-  else{
-  return 0;
+  for (int i = 1; i < quantityOfSensors; i++) {
+    if (((sensorValue[i] >= minGreenLimit) && (sensorValue[i] <= maxGreenLimit)) && ((sensorValue[i - 1] >= minGreenLimit) && (sensorValue[i - 1] <= maxGreenLimit))) {
+      if (i <= 3) {
+        return -1;
+      }
+      else if (i >= 4) {
+        return 1;
+      }
+      else
+        return 0;
+    }
   }
 
+  return 0;
 }
+
+
 
 int getGray() {
   int counter;
@@ -381,7 +382,8 @@ void doSpecialCase() {
   switch (specialCase) {
     case -2:
       Serial.println("VERDE DETECTADO - L");
-      movement('l');
+      leftControlled(6);
+      frontControlled(5);
       break;
 
     case -1:
@@ -391,12 +393,14 @@ void doSpecialCase() {
 
     case 1:
       //rightDegCurve();
+
       movement('r');
       break;
 
     case 2:
       Serial.println("VERDE DETECTADO - R");
-      movement('r');
+      rightControlled(6);
+      frontControlled(5);
       break;
 
     case 3:
@@ -511,7 +515,6 @@ void turnObstacle() {
 }
 
 void servoMove(char movementType) {
-
   switch (movementType) {
     //close
     case 'c':
@@ -645,21 +648,22 @@ void printData() {
   Serial.print(" ");
   Serial.print("Distance Front: ");
   Serial.print(distanceFront);
-  /*
-    Serial.print(leftMotorDirection);
+
+  /*Serial.print(leftMotorDirection);
     Serial.print(" ");
     Serial.print(leftEncoderRefletance);
     Serial.print(" ");
     Serial.print(leftEncoderState);
     Serial.print(" ");
-    Serial.print(leftEncoderPulses);
+    /*  Serial.print(leftEncoderPulses);
+    Serial.print(" ");
 
+    Serial.print(rightEncoderPulses);
+    Serial.print(" ");
+
+    /*Serial.print(rightEncoderState);
     Serial.print(" ");
     Serial.print(rightEncoderRefletance);
-    Serial.print(" ");
-    Serial.print(rightEncoderState);
-    Serial.print(" ");
-    Serial.print(rightEncoderPulses);
     Serial.print(" ");
     Serial.print(rightMotorDirection);
   */
