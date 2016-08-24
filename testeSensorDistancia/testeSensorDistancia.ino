@@ -1,8 +1,8 @@
-int frontSensorTrigger = 53;
-int frontSensorEcho = 54;
+ int frontSensorTrigger = 23;
+int frontSensorEcho = 22;
 
-int sideSensorTrigger = 23;
-int sideSensorEcho = 24;
+int sideSensorTrigger = 27;
+int sideSensorEcho = 26;
 
 
 void setup() {

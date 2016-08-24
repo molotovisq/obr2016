@@ -10,13 +10,13 @@ const int portFrontRight = 5;
 const int portBackLeft = 6;
 const int portFrontLeft = 7;
 
-//Portas dos Encoders
+//Portas dos Encoders 
 const int portLeftEncoder = A14;
 const int portRightEncoder = A15;
 
 //Portas dos servos motores
-const int portHand = 9;
-const int portArm = 10;
+const int portHandServo = 9;
+const int portArmServo = 10;
 
 //Constantes para as portas e quantidade de sensores de linha
 const int quantityOfSensors = 8;
@@ -37,7 +37,7 @@ Servo armServo;
 const int blackLimit = 700;
 const int whiteLimit = 100;
 const int maxGreenLimit = 400;
-const int minGreenLimit = 100;
+const int minGreenLimit = 150;
 const int maxGrayLimit = 0;
 const int minGrayLimit = 0;
 
@@ -111,22 +111,30 @@ bool leftMotorDirection;
 bool rightMotorDirection;
 
 //Portas dos sensores de distancia
-const int triggerDistanceFront = 53;
-const int echoDistanceFront = 52;
+const int triggerDistanceFront = 23;
+const int echoDistanceFront = 22;
 
-//Distancia da frente
+const int triggerDistanceLeft = 25;
+const int echoDistanceLeft = 24;
+
+const int triggerDistanceRight = 27;
+const int echoDistanceRight = 26;
+
+//Variaveis das distancias
 float distanceFront;
+float distanceLeft;
+float distanceRight;
 
 //Distancia para desviar do obstaculo
-const float turnDistance = 13.0;
+const float turnDistance = 12.0;
 
 bool rescuing = false;
 
 void setup() {
   Serial.begin(9600);
   //Inicialização das portas dos servos
-  handServo.attach(8);
-  armServo.attach(9);
+  handServo.attach(portHandServo);
+  armServo.attach(portArmServo);
 
   //Inicialização das posições
   servoMove('i');
@@ -134,6 +142,15 @@ void setup() {
   pinMode(triggerDistanceFront, OUTPUT);
   pinMode(echoDistanceFront, INPUT);
 
+  pinMode(triggerDistanceLeft, OUTPUT);
+  pinMode(echoDistanceLeft, INPUT);
+  
+  pinMode(triggerDistanceLeft, OUTPUT);
+  pinMode(echoDistanceLeft, INPUT);
+
+  pinMode(portFrontLeft, OUTPUT);
+  pinMode(portBackLeft, OUTPUT);
+  pinMode(portFrontRight, OUTPUT);
   pinMode(portBackRight, OUTPUT);
 
 }
@@ -145,8 +162,8 @@ void loop() {
     globalError = readLine(sensorValue, quantityOfSensors);
     pd = calculatePD(globalError, lastGlobalError);
     getSimpleSensorValue();
-    getSpecialCase();
     getLineDistances();
+    getSpecialCase();
     getEncodersRefletance();
     getEncodersState();
     getEncodersPulse();
@@ -167,7 +184,7 @@ void loop() {
 
 
 void getGlobalTime() {
-  globalTime = millis();
+  globalTime = millis()/1000;
 }
 
 
@@ -368,7 +385,7 @@ void getSpecialCase() {
 
   }
 
-  else if (distanceFront < turnDistance && distanceFront != 0) {
+  else if (distanceFront < turnDistance && distanceFront > 2 && globalTime > 20) {
     specialCase = 3;
   }
 
@@ -388,12 +405,13 @@ void doSpecialCase() {
 
     case -1:
       //leftDegCurve();
+      //leftControlled(1);
       movement('l');
       break;
 
     case 1:
       //rightDegCurve();
-
+      //rightControlled(1);
       movement('r');
       break;
 
@@ -493,24 +511,20 @@ float getDistance(int trigPin, int echoPin) {
   return distance;
 }
 
-
-float getLineDistances() {
-  distanceFront = getDistance(triggerDistanceFront, echoDistanceFront);
-}
 //Função que gera as distancias
-float lineUpdateDistances() {
-  distanceFront = getDistance(52, 53);
+float getLineDistances() {
+  distanceFront = getDistance(triggerDistanceFront,echoDistanceFront);
 }
 
 void turnObstacle() {
   backControlled(3);//ok
   rightControlled(8);//ok
   frontControlled(14);
-  leftControlled(11);//ok
+  leftControlled(8);//ok
   frontControlled(30);
-  leftControlled(11);
+  leftControlled(8);
   frontControlled(15);
-  rightControlled(6);
+  rightControlled(8);
   backControlled(1);
 }
 
