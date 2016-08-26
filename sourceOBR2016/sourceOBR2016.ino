@@ -10,7 +10,7 @@ const int portFrontRight = 5;
 const int portBackLeft = 6;
 const int portFrontLeft = 7;
 
-//Portas dos Encoders 
+//Portas dos Encoders
 const int portLeftEncoder = A14;
 const int portRightEncoder = A15;
 
@@ -34,7 +34,7 @@ Servo handServo;
 Servo armServo;
 
 //Limiar entre o preto e o branco
-const int blackLimit = 700;
+const int blackLimit = 600;
 const int whiteLimit = 100;
 const int maxGreenLimit = 400;
 const int minGreenLimit = 150;
@@ -126,7 +126,7 @@ float distanceLeft;
 float distanceRight;
 
 //Distancia para desviar do obstaculo
-const float turnDistance = 12.0;
+const float turnDistance = 10.0;
 
 bool rescuing = false;
 
@@ -144,7 +144,7 @@ void setup() {
 
   pinMode(triggerDistanceLeft, OUTPUT);
   pinMode(echoDistanceLeft, INPUT);
-  
+
   pinMode(triggerDistanceLeft, OUTPUT);
   pinMode(echoDistanceLeft, INPUT);
 
@@ -184,7 +184,7 @@ void loop() {
 
 
 void getGlobalTime() {
-  globalTime = millis()/1000;
+  globalTime = millis() / 1000;
 }
 
 
@@ -201,6 +201,7 @@ long readLine(int sensors[], int sensorQuantity) {
   long denominator = 0;
 
   for (int i = 0; i < sensorQuantity; i++) {
+
     numerator += (i * 1000 * (long)sensors[i]);
     denominator += sensors[i];
   }
@@ -284,7 +285,7 @@ void movement(char movementType) {
     case 'l':
       analogWrite(portFrontLeft, 0);
       analogWrite(portFrontRight, globalInitSpeed);
-      analogWrite(portBackLeft, globalInitSpeed + 50);
+      analogWrite(portBackLeft, globalInitSpeed);
       analogWrite(portBackRight, 0);
       setMotorDirection(0, 1);
       break;
@@ -293,8 +294,15 @@ void movement(char movementType) {
       analogWrite(portFrontLeft, globalInitSpeed);
       analogWrite(portFrontRight, 0);
       analogWrite(portBackLeft, 0);
-      analogWrite(portBackRight, globalInitSpeed + 50);
+      analogWrite(portBackRight, globalInitSpeed);
       setMotorDirection(1, 0);
+      break;
+    case 's':
+      analogWrite(portFrontLeft, 0);
+      analogWrite(portFrontRight, 0);
+      analogWrite(portBackLeft, 0);
+      analogWrite(portBackRight, 0);
+      setMotorDirection(0, 0);
       break;
   }
 }
@@ -314,7 +322,7 @@ int getNineDeg() {
 
 int getGreen() {
   for (int i = 1; i < quantityOfSensors; i++) {
-    if (((sensorValue[i] >= minGreenLimit) && (sensorValue[i] <= maxGreenLimit)) && ((sensorValue[i - 1] >= minGreenLimit) && (sensorValue[i - 1] <= maxGreenLimit))) {
+    if (((sensorValue[i] >= minGreenLimit) && (sensorValue[i] <= maxGreenLimit)) && ((sensorValue[i - 1] >= minGreenLimit) && (sensorValue[i - 1] <= maxGreenLimit)) && ((sensorValue[i - 2] > blackLimit) || (sensorValue[i + 1] > blackLimit))) {
       if (i <= 3) {
         return -1;
       }
@@ -399,6 +407,7 @@ void doSpecialCase() {
   switch (specialCase) {
     case -2:
       Serial.println("VERDE DETECTADO - L");
+      frontControlled(1);
       leftControlled(6);
       frontControlled(5);
       break;
@@ -417,6 +426,7 @@ void doSpecialCase() {
 
     case 2:
       Serial.println("VERDE DETECTADO - R");
+      frontControlled(1);
       rightControlled(6);
       frontControlled(5);
       break;
@@ -427,21 +437,6 @@ void doSpecialCase() {
 
   }
 }
-
-
-void frontDeg() {
-  lastLeftEncoderPulses = leftEncoderPulses;
-  lastRightEncoderPulses = rightEncoderPulses;
-
-  do {
-    getEncodersRefletance();
-    getEncodersState();
-    getEncodersPulse();
-    movement('f');
-  } while (lastLeftEncoderPulses != leftEncoderPulses - frontDegPulses && lastRightEncoderPulses != rightEncoderPulses - frontDegPulses);
-}
-
-
 
 void frontControlled(int pulses) {
   lastLeftEncoderPulses = leftEncoderPulses;
@@ -465,7 +460,8 @@ void leftControlled(int pulses) {
     getEncodersState();
     getEncodersPulse();
     movement('l');
-  }  while (lastLeftEncoderPulses != leftEncoderPulses + pulses && lastRightEncoderPulses != rightEncoderPulses - pulses);
+    printData();
+  }  while ((lastLeftEncoderPulses != (leftEncoderPulses + pulses)) && (lastRightEncoderPulses != (rightEncoderPulses - pulses)));
 
 }
 
@@ -478,9 +474,11 @@ void rightControlled(int pulses) {
     getEncodersState();
     getEncodersPulse();
     movement('r');
-  } while (lastLeftEncoderPulses != leftEncoderPulses - pulses && lastRightEncoderPulses != rightEncoderPulses + pulses);
+    printData();
+  }  while ((lastLeftEncoderPulses != (leftEncoderPulses - pulses)) && (lastRightEncoderPulses != (rightEncoderPulses + pulses)));
 
 }
+
 
 void backControlled(int pulses) {
   lastLeftEncoderPulses = leftEncoderPulses;
@@ -513,19 +511,48 @@ float getDistance(int trigPin, int echoPin) {
 
 //Função que gera as distancias
 float getLineDistances() {
-  distanceFront = getDistance(triggerDistanceFront,echoDistanceFront);
+  distanceFront = getDistance(triggerDistanceFront, echoDistanceFront);
 }
 
 void turnObstacle() {
-  backControlled(3);//ok
-  rightControlled(8);//ok
+  backControlled(3);
+  movement('s');
+  delay(100);
+  leftControlled(9);
+  movement('s');
+  delay(100);
   frontControlled(14);
-  leftControlled(8);//ok
-  frontControlled(30);
-  leftControlled(8);
-  frontControlled(15);
+  movement('s');
+  delay(100);
   rightControlled(8);
-  backControlled(1);
+  movement('s');
+  delay(100);
+  frontControlled(24);
+  movement('s');
+  delay(100);
+  rightControlled(9);
+  movement('s');
+  delay(100);
+  do {
+    getLineSensorValues();
+    movement('f');
+
+  } while ((sensorValue[0] < blackLimit) && (sensorValue[1] < blackLimit) && (sensorValue[2] < blackLimit) && (sensorValue[3] < blackLimit) && (sensorValue[4] < blackLimit) && (sensorValue[5] < blackLimit) && (sensorValue[6] < blackLimit) && (sensorValue[7] < blackLimit));
+
+
+  /*frontControlled(15);
+    movement('s');
+    delay(100);
+  */
+  frontControlled(5);
+  movement('s');
+  delay(100);
+  leftControlled(9);
+  movement('s');
+  delay(100);
+  backControlled(3);
+  movement('s');
+  delay(100);
 }
 
 void servoMove(char movementType) {
@@ -651,36 +678,36 @@ void searchHostage() {
 
 //Função utilizada para debugging, onde envia as variaveis desejadas para a saida serial
 void printData() {
+  /*
+    Serial.print(speedLeft);
+    Serial.print(" ");
+    Serial.print(globalError);
+    Serial.print(" ");
+    Serial.print(speedRight);
+    Serial.print(" Green: ");
+    Serial.print(getGreen());
+    Serial.print(" ");
+    Serial.print("Distance Front: ");
+    Serial.print(distanceFront);
 
-  Serial.print(speedLeft);
+  */Serial.print(leftMotorDirection);
   Serial.print(" ");
-  Serial.print(globalError);
+  Serial.print(leftEncoderRefletance);
   Serial.print(" ");
-  Serial.print(speedRight);
-  Serial.print(" Green: ");
-  Serial.print(getGreen());
+  Serial.print(leftEncoderState);
   Serial.print(" ");
-  Serial.print("Distance Front: ");
-  Serial.print(distanceFront);
+  Serial.print(leftEncoderPulses);
+  Serial.print(" ");
 
-  /*Serial.print(leftMotorDirection);
-    Serial.print(" ");
-    Serial.print(leftEncoderRefletance);
-    Serial.print(" ");
-    Serial.print(leftEncoderState);
-    Serial.print(" ");
-    /*  Serial.print(leftEncoderPulses);
-    Serial.print(" ");
+  Serial.print(rightEncoderPulses);
+  Serial.print(" ");
 
-    Serial.print(rightEncoderPulses);
-    Serial.print(" ");
+  Serial.print(rightEncoderState);
+  Serial.print(" ");
+  Serial.print(rightEncoderRefletance);
+  Serial.print(" ");
+  Serial.print(rightMotorDirection);
 
-    /*Serial.print(rightEncoderState);
-    Serial.print(" ");
-    Serial.print(rightEncoderRefletance);
-    Serial.print(" ");
-    Serial.print(rightMotorDirection);
-  */
   Serial.println();
 }
 
